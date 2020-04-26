@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,9 +15,12 @@ import (
 )
 
 var (
-	pcapFile string = "dns.pcap"
-	handle   *pcap.Handle
-	err      error
+	inputFile  = flag.String("inputfile", "", "path to pcap file to trim")
+	outputFile = flag.String("outputfile", "", "path to pcap file to output trimmed data to")
+	// TODO use a better logging library to implement this, fsck the default one
+	verbose = flag.Bool("verbose", false, "verbose logging, unimplemented")
+	handle  *pcap.Handle
+	err     error
 )
 
 // Given a packet, pulls out all the low level layers, stripping anything
@@ -90,7 +94,7 @@ func trimPacket(packet gopacket.Packet) (gopacket.Packet, error) {
 //    packet: the trimmed packet
 //		originalLength: the length of the untrimmed packet, which must be preserved in the final result
 //										to pass sanity checks
-//		writer: an open pcapgo writer for outputting the trimmed packet	
+//		writer: an open pcapgo writer for outputting the trimmed packet
 func writeTrimmedPacket(packet gopacket.Packet, originalLength int, writer *pcapgo.Writer) error {
 	// we'll need to make sure that the capture info represents the correct size, it defaults to being 0'd out
 	// for new packets
@@ -105,9 +109,23 @@ func writeTrimmedPacket(packet gopacket.Packet, originalLength int, writer *pcap
 }
 
 func main() {
+	flag.Parse()
+	// yuuuup this is basically how I have to do it until I use a better flag library
+	if len(os.Args) <= 1 {
+		flag.PrintDefaults()
+		return
+	}
+
+	if *inputFile == "" {
+		log.Fatal("inputfile is a required argument")
+	}
+
+	if *outputFile == "" {
+		log.Fatal("outputfile is a required argument")
+	}
 	// TODO configurable logging, flags for input and output files, flags for skipping errors
 	// open input and output files
-	handle, err = pcap.OpenOffline(pcapFile)
+	handle, err = pcap.OpenOffline(*inputFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -115,7 +133,7 @@ func main() {
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	f, _ := os.Create("test.pcap")
+	f, _ := os.Create(*outputFile)
 	defer f.Close()
 	w := pcapgo.NewWriter(f)
 
